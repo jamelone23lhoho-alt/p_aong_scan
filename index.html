@@ -42,7 +42,7 @@
   .icon-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
   .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; backdrop-filter: blur(10px); margin-bottom: 16px; }
   label { display: block; font-size: 13px; color: var(--soft); margin: 0 0 6px; }
-  input[type="text"], input[type="password"], input[type="url"] {
+  input[type="text"], input[type="password"] {
     width: 100%; font-family: inherit; font-size: 15px; color: var(--ink);
     background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 10px;
     padding: 12px 14px; margin-bottom: 14px; box-sizing: border-box;
@@ -71,25 +71,35 @@
   .hidden { display: none; }
   .row { display: flex; gap: 10px; }
   .row .btn { margin: 0; }
+  .lock {
+    position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center;
+    padding: 24px; background: rgba(4, 8, 14, 0.9); backdrop-filter: blur(10px);
+  }
+  .lock-card { width: 100%; max-width: 340px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px 22px; text-align: center; }
+  .lock-card h2 { font-family: "Kanit", sans-serif; margin: 0 0 6px; font-size: 22px; }
+  .lock-card p { margin: 0 0 20px; color: var(--soft); font-size: 14px; }
+  .lock-card input { text-align: center; letter-spacing: 0.5em; font-family: "Kanit", sans-serif; font-size: 22px; }
+  .err { color: var(--bad); font-size: 13px; margin: -6px 0 12px; min-height: 18px; }
 </style>
 </head>
 <body>
+<div class="lock" id="lock">
+  <div class="lock-card">
+    <h2>เช็คชื่อเข้างาน</h2>
+    <p>ใส่ PIN เจ้าหน้าที่เพื่อเริ่มใช้งาน</p>
+    <input type="password" id="pin" inputmode="numeric" placeholder="PIN" autocomplete="off" />
+    <div class="err" id="err"></div>
+    <button class="btn" id="unlock">เข้าสู่ระบบ</button>
+  </div>
+</div>
+
 <div class="wrap">
   <header>
     <div>
       <h1>เช็คชื่อเข้างาน</h1>
       <div class="count" id="count">เช็คอินแล้ว <b id="cin">–</b> / <span id="ctotal">–</span></div>
     </div>
-    <button class="icon-btn" id="settingsBtn">ตั้งค่า</button>
   </header>
-
-  <div class="panel hidden" id="settings">
-    <label for="url">Apps Script URL (ลงท้าย /exec)</label>
-    <input type="url" id="url" placeholder="https://script.google.com/macros/s/xxx/exec" />
-    <label for="pin">PIN เจ้าหน้าที่</label>
-    <input type="password" id="pin" inputmode="numeric" placeholder="ใส่ PIN" />
-    <button class="btn" id="saveCfg">บันทึกการตั้งค่า</button>
-  </div>
 
   <div id="resultBox"></div>
 
@@ -109,13 +119,13 @@
 </div>
 
 <script>
-  var cfg = { url: localStorage.getItem("scanUrl") || "", pin: localStorage.getItem("scanPin") || "" };
+  var SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx120fWJokmgLilQS-KeGhzxRZ5uStTe9GRYqJHxMPaWsLLvtyy_WsaoHQDLJ7SneYsCw/exec";
+  var pin = "";
   var scanner = null;
   var running = false;
   var processing = false;
   var lastCode = "";
   var lastAt = 0;
-  var sessionCount = 0;
 
   var el = function (id) { return document.getElementById(id); };
 
@@ -150,9 +160,8 @@
   }
 
   async function loadStats() {
-    if (!cfg.url || !cfg.pin) return;
     try {
-      var res = await fetch(cfg.url + "?action=stats&pin=" + encodeURIComponent(cfg.pin), { cache: "no-store" });
+      var res = await fetch(SCRIPT_URL + "?action=stats&pin=" + encodeURIComponent(pin), { cache: "no-store" });
       var d = await res.json();
       if (d.ok) { el("cin").textContent = d.checkedIn; el("ctotal").textContent = d.total; }
     } catch (e) {}
@@ -162,16 +171,15 @@
     if (processing) return;
     code = String(code || "").trim();
     if (!code) return;
-    if (!cfg.url || !cfg.pin) { openSettings(); return; }
     var now = Date.now();
     if (code === lastCode && now - lastAt < 3000) return;
     lastCode = code; lastAt = now;
     processing = true;
     try {
-      var res = await fetch(cfg.url + "?action=checkin&code=" + encodeURIComponent(code) + "&pin=" + encodeURIComponent(cfg.pin), { cache: "no-store" });
+      var res = await fetch(SCRIPT_URL + "?action=checkin&code=" + encodeURIComponent(code) + "&pin=" + encodeURIComponent(pin), { cache: "no-store" });
       var d = await res.json();
       if (!d.ok) { showResult("invalid", d.error || "ผิดพลาด", null); }
-      else if (d.result === "success") { sessionCount++; showResult("success", "เช็คอินสำเร็จ", d); loadStats(); }
+      else if (d.result === "success") { showResult("success", "เช็คอินสำเร็จ", d); loadStats(); }
       else if (d.result === "already") { showResult("already", "สแกนซ้ำ", d); }
       else { showResult("invalid", "QR ไม่ถูกต้อง", null); }
     } catch (e) {
@@ -183,7 +191,6 @@
   function onScan(text) { handleCode(text); }
 
   async function startScan() {
-    if (!cfg.url || !cfg.pin) { openSettings(); return; }
     if (running) return;
     scanner = new Html5Qrcode("reader");
     try {
@@ -205,34 +212,36 @@
     }
   }
 
-  function openSettings() {
-    el("url").value = cfg.url;
-    el("pin").value = cfg.pin;
-    el("settings").classList.remove("hidden");
+  async function tryUnlock() {
+    var entered = el("pin").value.trim();
+    if (!entered) return;
+    el("err").textContent = "";
+    el("unlock").textContent = "กำลังตรวจสอบ…";
+    try {
+      var res = await fetch(SCRIPT_URL + "?action=stats&pin=" + encodeURIComponent(entered), { cache: "no-store" });
+      var d = await res.json();
+      if (d.ok) {
+        pin = entered;
+        el("cin").textContent = d.checkedIn;
+        el("ctotal").textContent = d.total;
+        el("lock").classList.add("hidden");
+      } else {
+        el("err").textContent = d.error || "PIN ไม่ถูกต้อง";
+      }
+    } catch (e) {
+      el("err").textContent = "เชื่อมต่อไม่ได้ ลองใหม่";
+    }
+    el("unlock").textContent = "เข้าสู่ระบบ";
   }
 
-  el("settingsBtn").addEventListener("click", function () {
-    el("settings").classList.toggle("hidden");
-    el("url").value = cfg.url;
-    el("pin").value = cfg.pin;
-  });
-
-  el("saveCfg").addEventListener("click", function () {
-    cfg.url = el("url").value.trim();
-    cfg.pin = el("pin").value.trim();
-    localStorage.setItem("scanUrl", cfg.url);
-    localStorage.setItem("scanPin", cfg.pin);
-    el("settings").classList.add("hidden");
-    loadStats();
-  });
-
+  el("unlock").addEventListener("click", tryUnlock);
+  el("pin").addEventListener("keydown", function (e) { if (e.key === "Enter") tryUnlock(); });
   el("startBtn").addEventListener("click", startScan);
   el("stopBtn").addEventListener("click", stopScan);
   el("manualBtn").addEventListener("click", function () { handleCode(el("manual").value); el("manual").value = ""; });
   el("manual").addEventListener("keydown", function (e) { if (e.key === "Enter") { handleCode(el("manual").value); el("manual").value = ""; } });
 
-  if (!cfg.url || !cfg.pin) openSettings();
-  loadStats();
+  el("pin").focus();
 </script>
 </body>
 </html>
