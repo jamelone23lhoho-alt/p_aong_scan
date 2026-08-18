@@ -198,7 +198,7 @@
 
   function tryUnlock() {
     if (el("pin").value.trim() === PIN_CODE) {
-      el("lock").classList.add("hidden");
+      el("lock").style.display = "none";
     } else {
       el("err").textContent = "PIN ไม่ถูกต้อง";
       el("pin").value = "";
