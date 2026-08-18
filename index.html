@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>เช็คชื่อเข้างาน · Tamca Night Party</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&family=Kanit:wght@500;600;700&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root {
+    --bg1: #0a1524;
+    --bg2: #05080e;
+    --panel: rgba(13, 21, 33, 0.72);
+    --line: rgba(120, 175, 225, 0.24);
+    --ink: #e9f1f8;
+    --soft: #9db4c8;
+    --faint: #6a8098;
+    --elec: #33a9e8;
+    --elecdeep: #1b7bc0;
+    --ok: #47d19a;
+    --warn: #e2b23c;
+    --bad: #ff6f61;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Anuphan", system-ui, sans-serif;
+    color: var(--ink);
+    background:
+      radial-gradient(95% 55% at 50% 0%, rgba(51,169,232,0.18), transparent 60%),
+      linear-gradient(180deg, var(--bg1), var(--bg2) 60%);
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; padding: 20px 16px 48px; }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+  h1 { font-family: "Kanit", sans-serif; font-weight: 700; font-size: 22px; margin: 0; }
+  .count { font-size: 13px; color: var(--soft); margin-top: 4px; }
+  .count b { color: var(--elec); font-family: "Kanit", sans-serif; }
+  .icon-btn { background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--ink); border-radius: 10px; padding: 8px 12px; font-size: 13px; cursor: pointer; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; backdrop-filter: blur(10px); margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: var(--soft); margin: 0 0 6px; }
+  input[type="text"], input[type="password"], input[type="url"] {
+    width: 100%; font-family: inherit; font-size: 15px; color: var(--ink);
+    background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 14px; box-sizing: border-box;
+  }
+  input:focus { outline: none; border-color: var(--elec); background: rgba(255,255,255,0.07); }
+  .btn { width: 100%; font-family: "Kanit", sans-serif; font-weight: 600; font-size: 16px; color: #04121d;
+    background: linear-gradient(180deg, #56c1f5, #1b7bc0); border: none; border-radius: 10px; padding: 14px; cursor: pointer;
+    box-shadow: 0 12px 28px -14px rgba(51,169,232,0.75); }
+  .btn:active { transform: translateY(1px); }
+  .btn.secondary { background: rgba(255,255,255,0.06); color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+  #reader { width: 100%; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); }
+  #reader video { border-radius: 14px; }
+  .result { border-radius: 14px; padding: 18px; margin-bottom: 16px; text-align: center; animation: pop 0.25s ease; }
+  @keyframes pop { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  .result h2 { font-family: "Kanit", sans-serif; margin: 0 0 6px; font-size: 22px; }
+  .result p { margin: 2px 0; font-size: 15px; }
+  .result .card-no { font-family: "Kanit", sans-serif; font-size: 30px; font-weight: 700; letter-spacing: 0.1em; margin: 6px 0; }
+  .r-ok { background: rgba(71,209,154,0.14); border: 1px solid rgba(71,209,154,0.5); }
+  .r-ok h2 { color: var(--ok); }
+  .r-warn { background: rgba(226,178,60,0.14); border: 1px solid rgba(226,178,60,0.5); }
+  .r-warn h2 { color: var(--warn); }
+  .r-bad { background: rgba(255,111,97,0.14); border: 1px solid rgba(255,111,97,0.5); }
+  .r-bad h2 { color: var(--bad); }
+  .muted { color: var(--faint); font-size: 12.5px; }
+  .divider { text-align: center; color: var(--faint); font-size: 12px; margin: 14px 0; letter-spacing: 0.1em; }
+  .hidden { display: none; }
+  .row { display: flex; gap: 10px; }
+  .row .btn { margin: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>เช็คชื่อเข้างาน</h1>
+      <div class="count" id="count">เช็คอินแล้ว <b id="cin">–</b> / <span id="ctotal">–</span></div>
+    </div>
+    <button class="icon-btn" id="settingsBtn">ตั้งค่า</button>
+  </header>
+
+  <div class="panel hidden" id="settings">
+    <label for="url">Apps Script URL (ลงท้าย /exec)</label>
+    <input type="url" id="url" placeholder="https://script.google.com/macros/s/xxx/exec" />
+    <label for="pin">PIN เจ้าหน้าที่</label>
+    <input type="password" id="pin" inputmode="numeric" placeholder="ใส่ PIN" />
+    <button class="btn" id="saveCfg">บันทึกการตั้งค่า</button>
+  </div>
+
+  <div id="resultBox"></div>
+
+  <div class="panel" id="scanPanel">
+    <div id="reader"></div>
+    <div style="height:14px"></div>
+    <div class="row">
+      <button class="btn" id="startBtn">เริ่มสแกน</button>
+      <button class="btn secondary hidden" id="stopBtn">หยุด</button>
+    </div>
+    <div class="divider">หรือพิมพ์รหัสเอง</div>
+    <input type="text" id="manual" placeholder="เช่น 123-a1b2c3..." />
+    <button class="btn secondary" id="manualBtn">เช็คอินด้วยรหัส</button>
+  </div>
+
+  <p class="muted">ชี้กล้องไปที่ QR ของผู้เข้าร่วม ระบบจะบันทึกเวลาเข้างานและกันสแกนซ้ำให้อัตโนมัติ</p>
+</div>
+
+<script>
+  var cfg = { url: localStorage.getItem("scanUrl") || "", pin: localStorage.getItem("scanPin") || "" };
+  var scanner = null;
+  var running = false;
+  var processing = false;
+  var lastCode = "";
+  var lastAt = 0;
+  var sessionCount = 0;
+
+  var el = function (id) { return document.getElementById(id); };
+
+  function beep(freq, dur) {
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ctx.createOscillator();
+      var g = ctx.createGain();
+      o.frequency.value = freq;
+      o.connect(g); g.connect(ctx.destination);
+      g.gain.setValueAtTime(0.15, ctx.currentTime);
+      o.start();
+      o.stop(ctx.currentTime + dur);
+    } catch (e) {}
+  }
+
+  function showResult(kind, title, info) {
+    var cls = kind === "success" ? "r-ok" : kind === "already" ? "r-warn" : "r-bad";
+    var html = '<div class="result ' + cls + '"><h2>' + title + '</h2>';
+    if (info) {
+      if (info.cardNo) html += '<div class="card-no">' + info.cardNo + '</div>';
+      if (info.tier) html += '<p>' + info.tier + '</p>';
+      if (info.name) html += '<p>' + info.name + '</p>';
+      if (info.role) html += '<p class="muted">' + info.role + '</p>';
+      if (kind === "already" && info.at) html += '<p class="muted">เข้างานแล้วเมื่อ ' + info.at + '</p>';
+    }
+    html += '</div>';
+    el("resultBox").innerHTML = html;
+    if (kind === "success") { beep(880, 0.15); if (navigator.vibrate) navigator.vibrate(120); }
+    else if (kind === "already") { beep(500, 0.12); setTimeout(function () { beep(500, 0.12); }, 150); if (navigator.vibrate) navigator.vibrate([80, 60, 80]); }
+    else { beep(220, 0.3); if (navigator.vibrate) navigator.vibrate(300); }
+  }
+
+  async function loadStats() {
+    if (!cfg.url || !cfg.pin) return;
+    try {
+      var res = await fetch(cfg.url + "?action=stats&pin=" + encodeURIComponent(cfg.pin), { cache: "no-store" });
+      var d = await res.json();
+      if (d.ok) { el("cin").textContent = d.checkedIn; el("ctotal").textContent = d.total; }
+    } catch (e) {}
+  }
+
+  async function handleCode(code) {
+    if (processing) return;
+    code = String(code || "").trim();
+    if (!code) return;
+    if (!cfg.url || !cfg.pin) { openSettings(); return; }
+    var now = Date.now();
+    if (code === lastCode && now - lastAt < 3000) return;
+    lastCode = code; lastAt = now;
+    processing = true;
+    try {
+      var res = await fetch(cfg.url + "?action=checkin&code=" + encodeURIComponent(code) + "&pin=" + encodeURIComponent(cfg.pin), { cache: "no-store" });
+      var d = await res.json();
+      if (!d.ok) { showResult("invalid", d.error || "ผิดพลาด", null); }
+      else if (d.result === "success") { sessionCount++; showResult("success", "เช็คอินสำเร็จ", d); loadStats(); }
+      else if (d.result === "already") { showResult("already", "สแกนซ้ำ", d); }
+      else { showResult("invalid", "QR ไม่ถูกต้อง", null); }
+    } catch (e) {
+      showResult("invalid", "เชื่อมต่อไม่ได้", null);
+    }
+    setTimeout(function () { processing = false; }, 1200);
+  }
+
+  function onScan(text) { handleCode(text); }
+
+  async function startScan() {
+    if (!cfg.url || !cfg.pin) { openSettings(); return; }
+    if (running) return;
+    scanner = new Html5Qrcode("reader");
+    try {
+      await scanner.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 240, height: 240 } }, onScan);
+      running = true;
+      el("startBtn").classList.add("hidden");
+      el("stopBtn").classList.remove("hidden");
+    } catch (e) {
+      showResult("invalid", "เปิดกล้องไม่ได้", null);
+    }
+  }
+
+  async function stopScan() {
+    if (scanner && running) {
+      try { await scanner.stop(); await scanner.clear(); } catch (e) {}
+      running = false;
+      el("startBtn").classList.remove("hidden");
+      el("stopBtn").classList.add("hidden");
+    }
+  }
+
+  function openSettings() {
+    el("url").value = cfg.url;
+    el("pin").value = cfg.pin;
+    el("settings").classList.remove("hidden");
+  }
+
+  el("settingsBtn").addEventListener("click", function () {
+    el("settings").classList.toggle("hidden");
+    el("url").value = cfg.url;
+    el("pin").value = cfg.pin;
+  });
+
+  el("saveCfg").addEventListener("click", function () {
+    cfg.url = el("url").value.trim();
+    cfg.pin = el("pin").value.trim();
+    localStorage.setItem("scanUrl", cfg.url);
+    localStorage.setItem("scanPin", cfg.pin);
+    el("settings").classList.add("hidden");
+    loadStats();
+  });
+
+  el("startBtn").addEventListener("click", startScan);
+  el("stopBtn").addEventListener("click", stopScan);
+  el("manualBtn").addEventListener("click", function () { handleCode(el("manual").value); el("manual").value = ""; });
+  el("manual").addEventListener("keydown", function (e) { if (e.key === "Enter") { handleCode(el("manual").value); el("manual").value = ""; } });
+
+  if (!cfg.url || !cfg.pin) openSettings();
+  loadStats();
+</script>
+</body>
+</html>
